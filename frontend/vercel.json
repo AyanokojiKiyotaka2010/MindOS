@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://REPLACE_WITH_RENDER_SERVICE.onrender.com/api/:path*"
+      "destination": "https://mindos-api-7m1k.onrender.com/api/:path*"
     }
   ]
 }
