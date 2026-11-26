@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Activity, ArrowUpRight, BookOpen, BrainCircuit, Compass, LayoutDashboard,
-  Menu, Network, Plus, Settings, Share2, Sparkles, UserRound, X
+  Menu, Moon, Network, Plus, Settings, Share2, Sparkles, Sun, UserRound, X
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getApiHealth } from "../services/api";
@@ -36,6 +36,9 @@ const pageTitles: Record<string, string> = {
 
 export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    window.localStorage.getItem("mindos-theme") === "dark" ? "dark" : "light"
+  );
   const { user, logout } = useAuth();
   const location = useLocation();
   const { data, isError, isLoading } = useQuery({
@@ -46,6 +49,16 @@ export default function AppLayout() {
   const displayName = user?.display_name || "Your workspace";
   const initials = displayName.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "M";
   const pageTitle = pageTitles[location.pathname] || "Your workspace";
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem("mindos-theme", theme);
+    document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute(
+      "content",
+      theme === "dark" ? "#111522" : "#f7f8fc"
+    );
+  }, [theme]);
 
   const sidebar = (
     <div className="flex h-full flex-col">
@@ -126,7 +139,7 @@ export default function AppLayout() {
       )}
 
       <div className="lg:pl-[264px]">
-        <header className="sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-slate-200/70 bg-[#f7f8fc]/90 px-4 backdrop-blur-xl sm:px-6 lg:px-9">
+        <header className="sticky top-0 z-20 flex h-[72px] items-center justify-between border-b border-slate-200/70 bg-canvas/90 px-4 backdrop-blur-xl sm:px-6 lg:px-9">
           <div className="flex min-w-0 items-center gap-3">
             <button className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition hover:border-violet-200 hover:text-brand lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open navigation">
               <Menu size={18} />
@@ -144,6 +157,16 @@ export default function AppLayout() {
             <NavLink to="/vault" aria-label="Capture a new idea" className="hidden items-center gap-1.5 rounded-xl bg-[#24233c] px-3 py-2 text-[10px] font-bold text-white transition hover:bg-brand sm:inline-flex">
               <Plus size={14} /> <span>Capture</span>
             </NavLink>
+            <button
+              type="button"
+              onClick={() => setTheme((current) => current === "light" ? "dark" : "light")}
+              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+              aria-pressed={theme === "dark"}
+              title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+              className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition hover:border-violet-200 hover:text-brand"
+            >
+              {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
+            </button>
             <NavLink to="/profile" aria-label="Open your profile" className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-200 to-cyan-100 text-[10px] font-extrabold text-violet-900 ring-2 ring-white shadow-sm">
               {initials}
             </NavLink>

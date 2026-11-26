@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f7f8fc" />
+    <script>
+      const savedTheme = localStorage.getItem("mindos-theme");
+      document.documentElement.dataset.theme = savedTheme === "dark" ? "dark" : "light";
+    </script>
     <meta name="description" content="MINDOS — your personal knowledge and intelligence operating system." />
     <title>MINDOS — Personal Intelligence OS</title>
   </head>
