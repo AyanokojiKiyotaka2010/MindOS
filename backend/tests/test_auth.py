@@ -1,12 +1,14 @@
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.schema import CreateTable
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import get_db
 from app.main import app
-from app.models import Base
+from app.models import Base, UserProfile
 from app.core.config import Settings
 from app.api.routes import auth as auth_routes
 
@@ -210,6 +212,13 @@ def test_auth_cookies_are_secure_in_production(monkeypatch):
     ]
     assert len(cookies) == 2
     assert all("; secure" in cookie.lower() for cookie in cookies)
+
+
+def test_user_profile_schema_compiles_for_postgresql():
+    ddl = str(CreateTable(UserProfile.__table__).compile(dialect=postgresql.dialect()))
+
+    assert "VARCHAR(500)" in ddl
+    assert "TEXT(500)" not in ddl
 
 
 def test_learning_goal_lifecycle():
