@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, Enum, ForeignKey, JSON, String, Text, Table, Column
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, Enum, ForeignKey, JSON, String, Text, Table, Column, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -101,6 +101,7 @@ class User(Base):
 
     profile: Mapped["UserProfile | None"] = relationship(back_populates="user", cascade="all, delete-orphan", uselist=False)
     settings: Mapped["UserSettings | None"] = relationship(back_populates="user", cascade="all, delete-orphan", uselist=False)
+    integrations: Mapped[list["UserIntegration"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class UserProfile(Base):
@@ -134,6 +135,21 @@ class UserSettings(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="settings")
+
+
+class UserIntegration(Base):
+    __tablename__ = "user_integrations"
+    __table_args__ = (UniqueConstraint("user_id", "provider", name="uq_user_integrations_user_provider"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_value)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    username: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    encrypted_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(), default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="integrations")
 
 
 class KnowledgeItem(Base):

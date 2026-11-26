@@ -52,6 +52,21 @@ class SettingsResponse(BaseModel):
     locale: str
 
 
+class IntegrationUpdateRequest(BaseModel):
+    secret: str | None = Field(default=None, min_length=1, max_length=8192)
+    username: str | None = Field(default=None, min_length=2, max_length=64)
+
+
+class ChessAnalyticsRequest(BaseModel):
+    provider: str = Field(pattern=r"^(chesscom|lichess)$")
+
+
+class ChessImportRequest(BaseModel):
+    pgn: str | None = Field(default=None, min_length=1, max_length=2_000_000)
+    url: str | None = Field(default=None, min_length=1, max_length=2048)
+    username: str | None = Field(default=None, min_length=2, max_length=64)
+
+
 class KnowledgeSourceCreate(BaseModel):
     source_type: str = Field(default="manual", pattern=r"^(manual|file|url|book|article|video|other)$")
     source_title: str | None = Field(default=None, max_length=255)

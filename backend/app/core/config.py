@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     private_upload_dir: str = "./private_uploads"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
+    openai_model: str = "gpt-4o-mini"
+    anthropic_model: str = "claude-haiku-5-5"
+    integration_encryption_key: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

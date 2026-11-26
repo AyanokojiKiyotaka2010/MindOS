@@ -11,12 +11,15 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from pptx import Presentation
 from pptx.util import Inches
+from cryptography.fernet import Fernet
 
 from app.database import get_db
 from app.main import app
-from app.models import Base, UserProfile
+from app.models import Base, UserIntegration, UserProfile
 from app.core.config import Settings
 from app.api.routes import auth as auth_routes
+from app.api.routes import integrations as integration_routes
+from app import integration_security
 
 
 engine = create_engine(
@@ -474,3 +477,135 @@ def test_explicit_community_post_and_feed():
     feed = client.get("/api/v1/community/feed")
     assert feed.status_code == 200
     assert len(feed.json()) == 2
+
+
+def test_user_provider_keys_are_encrypted_and_never_returned(monkeypatch):
+    encryption_key = Fernet.generate_key().decode("ascii")
+    monkeypatch.setattr(
+        integration_security,
+        "get_settings",
+        lambda: Settings(_env_file=None, integration_encryption_key=encryption_key),
+    )
+    registered = client.post(
+        "/api/v1/auth/register",
+        json={"email": "keys@example.com", "password": "KeysArePrivate123", "display_name": "Key Owner"},
+    )
+    csrf = registered.cookies["mindos_csrf"]
+    secret = "private-provider-key"
+
+    saved = client.put(
+        "/api/v1/users/me/integrations/openai",
+        headers={"X-CSRF-Token": csrf},
+        json={"secret": secret},
+    )
+    assert saved.status_code == 200
+    status_response = client.get("/api/v1/users/me/integrations")
+    assert status_response.status_code == 200
+    openai = next(item for item in status_response.json()["providers"] if item["provider"] == "openai")
+    assert openai["configured"] is True
+    assert openai["user_key_saved"] is True
+    assert secret not in status_response.text
+
+    with TestingSessionLocal() as db:
+        integration = db.query(UserIntegration).filter_by(provider="openai").one()
+        assert integration.encrypted_secret != secret
+        assert integration_security.decrypt_integration_secret(integration.encrypted_secret) == secret
+
+    removed = client.delete(
+        "/api/v1/users/me/integrations/openai",
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert removed.status_code == 200
+    openai = next(item for item in client.get("/api/v1/users/me/integrations").json()["providers"] if item["provider"] == "openai")
+    assert openai["configured"] is False
+
+
+def test_user_provider_key_is_rejected_without_encryption_configuration(monkeypatch):
+    monkeypatch.setattr(
+        integration_security,
+        "get_settings",
+        lambda: Settings(_env_file=None, integration_encryption_key=""),
+    )
+    registered = client.post(
+        "/api/v1/auth/register",
+        json={"email": "unencrypted@example.com", "password": "NeverPlaintext123", "display_name": "Key Owner"},
+    )
+    response = client.put(
+        "/api/v1/users/me/integrations/openai",
+        headers={"X-CSRF-Token": registered.cookies["mindos_csrf"]},
+        json={"secret": "must-not-save"},
+    )
+
+    assert response.status_code == 503
+    assert "must-not-save" not in response.text
+
+
+def test_user_data_export_includes_personal_data_but_not_credentials(monkeypatch):
+    encryption_key = Fernet.generate_key().decode("ascii")
+    monkeypatch.setattr(
+        integration_security,
+        "get_settings",
+        lambda: Settings(_env_file=None, integration_encryption_key=encryption_key),
+    )
+    registered = client.post(
+        "/api/v1/auth/register",
+        json={"email": "export@example.com", "password": "ExportSecure123", "display_name": "Export User"},
+    )
+    csrf = registered.cookies["mindos_csrf"]
+    client.post(
+        "/api/v1/knowledge/items",
+        headers={"X-CSRF-Token": csrf},
+        json={
+            "title": "Exported note",
+            "content": "My private data",
+            "item_type": "note",
+            "understanding_status": "captured",
+            "tags": ["private"],
+            "sources": [],
+        },
+    )
+    client.put(
+        "/api/v1/users/me/integrations/anthropic",
+        headers={"X-CSRF-Token": csrf},
+        json={"secret": "secret-to-exclude"},
+    )
+
+    exported = client.get("/api/v1/users/me/data-export")
+    assert exported.status_code == 200
+    assert 'attachment; filename="mindos-data-export.json"' in exported.headers["content-disposition"]
+    data = exported.json()
+    assert data["knowledge_items"][0]["title"] == "Exported note"
+    assert data["tags"][0]["name"] == "private"
+    assert data["integrations"] == [{"provider": "anthropic", "username": None, "credential_configured": True}]
+    assert "password_hash" not in exported.text
+    assert "secret-to-exclude" not in exported.text
+
+
+def test_chess_account_refresh_analyzes_recent_pgn(monkeypatch):
+    registered = client.post(
+        "/api/v1/auth/register",
+        json={"email": "chess@example.com", "password": "ChessSecure123", "display_name": "Chess User"},
+    )
+    csrf = registered.cookies["mindos_csrf"]
+    connected = client.put(
+        "/api/v1/users/me/integrations/chesscom",
+        headers={"X-CSRF-Token": csrf},
+        json={"username": "Alice"},
+    )
+    assert connected.status_code == 200
+    pgn = '[Event "Test"]\n[White "Alice"]\n[Black "Bob"]\n[Result "1-0"]\n[ECO "C20"]\n[Opening "King Pawn Game"]\n\n1. e4 e5 1-0\n'
+
+    async def fetch_games(username):
+        return pgn
+
+    monkeypatch.setattr(integration_routes, "fetch_chesscom_games", fetch_games)
+
+    report = client.post(
+        "/api/v1/users/me/chess/analytics",
+        headers={"X-CSRF-Token": csrf},
+        json={"provider": "chesscom"},
+    )
+    assert report.status_code == 200
+    assert report.json()["games_analyzed"] == 1
+    assert report.json()["by_side"]["white"]["wins"] == 1
+    assert report.json()["by_side"]["white"]["openings"][0]["name"] == "King Pawn Game"

@@ -8,6 +8,7 @@ import {
   commitKnowledgeImport,
   getImportCapabilities,
   previewKnowledgeImport,
+  type AIProvider,
   type ImportCapabilities,
   type ImportPreview,
   type ImportPreviewRelation
@@ -23,9 +24,15 @@ function relationLabel(relation: ImportPreviewRelation, labels: Map<string, stri
   return `${labels.get(relation.source_draft_id) || "Idea"} ${relation.relation_type.replace(/_/g, " ")} ${labels.get(relation.target_draft_id) || "Idea"}`;
 }
 
+const aiProviders: Array<{ id: AIProvider; label: string; description: string }> = [
+  { id: "gemini", label: "Google Gemini", description: "Use your saved key or a server-provided Gemini key." },
+  { id: "openai", label: "OpenAI", description: "Use your personal OpenAI API key." },
+  { id: "anthropic", label: "Anthropic", description: "Use your personal Anthropic API key." },
+];
+
 export default function ImportPage() {
   const [files, setFiles] = useState<File[]>([]);
-  const [extractionMode, setExtractionMode] = useState<"local" | "gemini">("local");
+  const [extractionMode, setExtractionMode] = useState<"local" | AIProvider>("local");
   const [capabilities, setCapabilities] = useState<ImportCapabilities | null>(null);
   const [capabilityError, setCapabilityError] = useState("");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -48,7 +55,10 @@ export default function ImportPage() {
     for (const concept of preview?.concepts ?? []) map.set(concept.draft_id, concept.title);
     return map;
   }, [preview]);
-  const canUseGemini = Boolean(capabilities?.ai_features_enabled && capabilities.gemini_available);
+  const canUseProvider = (provider: AIProvider) => Boolean(
+    capabilities?.ai_features_enabled
+    && (capabilities.providers?.[provider] ?? (provider === "gemini" && capabilities.gemini_available))
+  );
   const selectedNodeIds = useMemo(() => new Set([...selectedDocuments, ...selectedConcepts]), [selectedDocuments, selectedConcepts]);
   const commitReady = Boolean(preview && (selectedDocuments.size > 0 || selectedConcepts.size > 0));
 
@@ -173,24 +183,32 @@ export default function ImportPage() {
                       <input type="radio" name="extractor" checked={extractionMode === "local"} onChange={() => setExtractionMode("local")} className="mt-0.5 accent-violet-600" />
                       <span><span className="block text-xs font-semibold text-ink">Private local extraction</span><span className="mt-1 block text-[10px] leading-4 text-slate-500">Uses titles, headings, tags, recurring phrases, and Obsidian links. Your text stays in MINDOS.</span></span>
                     </label>
-                    <label className={`flex gap-3 rounded-xl border p-4 transition ${canUseGemini ? "cursor-pointer" : "cursor-not-allowed opacity-60"} ${extractionMode === "gemini" ? "border-violet-300 bg-violet-50/60" : "border-slate-200"}`}>
-                      <input type="radio" name="extractor" checked={extractionMode === "gemini"} disabled={!canUseGemini} onChange={() => setExtractionMode("gemini")} className="mt-0.5 accent-violet-600" />
-                      <span><span className="block text-xs font-semibold text-ink">Gemini-assisted suggestions</span><span className="mt-1 block text-[10px] leading-4 text-slate-500">Adds semantic idea and link suggestions. Selected file text is sent to Google Gemini only when you analyze.</span></span>
-                    </label>
-                    {!canUseGemini && (
+                    {aiProviders.map((provider) => {
+                      const available = canUseProvider(provider.id);
+                      return (
+                        <label key={provider.id} className={`flex gap-3 rounded-xl border p-4 transition ${available ? "cursor-pointer" : "cursor-not-allowed opacity-60"} ${extractionMode === provider.id ? "border-violet-300 bg-violet-50/60" : "border-slate-200"}`}>
+                          <input type="radio" name="extractor" checked={extractionMode === provider.id} disabled={!available} onChange={() => setExtractionMode(provider.id)} className="mt-0.5 accent-violet-600" />
+                          <span>
+                            <span className="block text-xs font-semibold text-ink">{provider.label} suggestions</span>
+                            <span className="mt-1 block text-[10px] leading-4 text-slate-500">{provider.description} Selected file text is sent to that provider only when you analyze.</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                    {(!capabilities || !capabilities.ai_features_enabled || !aiProviders.some((provider) => canUseProvider(provider.id))) && (
                       <p className="flex items-start gap-2 px-1 text-[10px] leading-4 text-slate-500">
                         <CircleAlert size={13} className="mt-0.5 shrink-0 text-amber-500" />
-                        {capabilityError || (!capabilities ? "Checking Gemini availability…" : !capabilities.ai_features_enabled ? "Enable optional AI features in Profile settings and configure the backend Gemini key to use this option." : "Configure GEMINI_API_KEY on the backend to use this option.")}
+                        {capabilityError || (!capabilities ? "Checking provider availability…" : !capabilities.ai_features_enabled ? "Enable optional AI features in Settings to use an AI provider." : "Add a provider API key in Settings to enable AI-assisted suggestions.")}
                       </p>
                     )}
-                    {canUseGemini && extractionMode === "gemini" && <p className="rounded-lg bg-amber-50 px-3 py-2 text-[10px] leading-4 text-amber-800">Gemini receives the text content of the selected files for this analysis. Review its suggestions before importing.</p>}
+                    {extractionMode !== "local" && canUseProvider(extractionMode) && <p className="rounded-lg bg-amber-50 px-3 py-2 text-[10px] leading-4 text-amber-800">{aiProviders.find((provider) => provider.id === extractionMode)?.label} receives selected file text for this analysis. Review its suggestions before importing.</p>}
                   </div>
                 </div>
               </div>
               {error && <p role="alert" className="mt-5 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs text-rose-700">{error}</p>}
               <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
                 <p className="text-[10px] text-slate-400">ZIP paths are inspected safely; no uploaded binaries are retained on the server.</p>
-                <button type="button" disabled={!files.length || busy || (extractionMode === "gemini" && !canUseGemini)} onClick={() => void analyze()} className="inline-flex items-center gap-2 rounded-xl bg-[#24233c] px-5 py-3 text-xs font-bold text-white transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="button" disabled={!files.length || busy || (extractionMode !== "local" && !canUseProvider(extractionMode))} onClick={() => void analyze()} className="inline-flex items-center gap-2 rounded-xl bg-[#24233c] px-5 py-3 text-xs font-bold text-white transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-50">
                   {busy ? <><LoaderCircle size={14} className="animate-spin" /> Analyzing…</> : <>Analyze files <ArrowRight size={14} /></>}
                 </button>
               </div>

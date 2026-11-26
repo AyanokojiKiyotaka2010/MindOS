@@ -39,17 +39,27 @@ This creates a new PostgreSQL database; it does not migrate existing MySQL data.
 5. Set `CORS_ORIGINS` in Render to the exact Vercel production origin and redeploy the API.
 6. Open the Vercel `*.vercel.app` URL and test registration, login, profile, vault, and logout.
 
-## Bulk knowledge import and optional Gemini extraction
+## Bulk knowledge import and AI provider integrations
 
 The Knowledge Vault importer accepts Obsidian or Notion ZIP exports and Markdown, text, PDF, DOCX, PPTX, HTML, and CSV files. Imports are analyzed in memory and shown in a review screen; only selected documents, concepts, and links are saved. ZIP imports are limited to 25 MB per uploaded file, 50 MB total per import, and 100 supported documents. PDF import extracts selectable text; scanned PDFs are not OCR-processed.
 
-Local extraction uses note titles, Markdown headings, tags, wiki links, and repeated phrases. To enable the optional Gemini suggestions:
+Local extraction uses note titles, Markdown headings, tags, wiki links, and repeated phrases. Optional Gemini, OpenAI, and Anthropic suggestions are available when the account owner enables optional AI and selects a configured provider. The selected document text is sent to that provider only after the user starts analysis.
 
-1. Add `GEMINI_API_KEY` privately to the Render service's environment settings. Do not commit the key or paste it into chat. Optionally set `GEMINI_MODEL` (defaults to `gemini-2.5-flash`).
-2. In MINDOS, enable **Optional AI features** in Profile settings.
-3. During import, explicitly select **Gemini-assisted suggestions**. The selected document text is sent to Google Gemini for that analysis; local extraction does not send content to an AI provider.
+To allow users to save their own provider keys or Lichess tokens:
 
-Gemini availability, quotas, and possible charges depend on the provider's current terms and your account. Review all generated concepts and links before approving an import.
+1. Generate a Fernet key locally:
+
+   ```powershell
+   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+   ```
+
+2. Set `INTEGRATION_ENCRYPTION_KEY` in the backend's private environment. Keep the same value across deploys and back it up securely; saved credentials cannot be decrypted if this value is lost or changed.
+3. Optionally set a site-managed `GEMINI_API_KEY`. Users may instead add their own Gemini, OpenAI, or Anthropic keys in **Settings & privacy**. Personal keys are encrypted at rest and never returned to the frontend or data export.
+4. Run `alembic upgrade head` to create the `user_integrations` table. Render's configured startup command already applies Alembic migrations.
+
+Chess.com analytics fetches public monthly game archives by username and requires no API key. Lichess uses a username and can use a personal access token with game-reading permission. MINDOS analyzes at most the 200 most recent games in a refresh and does not store imported PGNs. URL analysis is limited to Chess.com profile/archive URLs and public Lichess profile/game URLs; Chess.com game pages should be imported by pasting PGN instead.
+
+Provider availability, quotas, prices, and terms can change. Review generated AI suggestions before approving an import. Chess opening labels and scores are descriptive statistics derived from PGN headers, not coaching or a skill diagnosis.
 
 ## Free-tier limitations
 

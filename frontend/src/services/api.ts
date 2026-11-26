@@ -90,6 +90,88 @@ export const updateSettings = (values: Partial<Settings>) =>
     body: JSON.stringify(values),
   });
 
+export type AIProvider = "gemini" | "openai" | "anthropic";
+export type ChessProvider = "chesscom" | "lichess";
+export type IntegrationProvider = AIProvider | ChessProvider;
+
+export type IntegrationsSummary = {
+  ai_key_storage_available: boolean;
+  ai_features_enabled: boolean;
+  providers: Array<{
+    provider: AIProvider;
+    configured: boolean;
+    user_key_saved: boolean;
+    server_key_available: boolean;
+  }>;
+  chess_accounts: Array<{
+    provider: ChessProvider;
+    connected: boolean;
+    username: string | null;
+    access_token_saved: boolean;
+  }>;
+};
+
+export const getIntegrations = () => apiRequest<IntegrationsSummary>("/users/me/integrations");
+
+export const saveIntegration = (provider: IntegrationProvider, values: { secret?: string; username?: string }) =>
+  apiRequest<{ provider: IntegrationProvider; connected: boolean }>(`/users/me/integrations/${provider}`, {
+    method: "PUT",
+    body: JSON.stringify(values),
+  });
+
+export const removeIntegration = (provider: IntegrationProvider) =>
+  apiRequest<{ provider: IntegrationProvider; connected: boolean }>(`/users/me/integrations/${provider}`, {
+    method: "DELETE",
+  });
+
+export async function downloadUserData(): Promise<Blob> {
+  const response = await fetch("/api/v1/users/me/data-export", { credentials: "include" });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.detail || `Data export failed (${response.status})`);
+  }
+  return response.blob();
+}
+
+export type ChessSideStats = {
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  score_percent: number;
+  openings: Array<{
+    name: string;
+    eco: string | null;
+    games: number;
+    wins: number;
+    draws: number;
+    losses: number;
+    score_percent: number;
+  }>;
+};
+
+export type ChessAnalytics = {
+  username: string;
+  games_analyzed: number;
+  source_games_parsed: number;
+  by_side: {
+    white: ChessSideStats;
+    black: ChessSideStats;
+  };
+};
+
+export const getChessAnalytics = (provider: ChessProvider) =>
+  apiRequest<ChessAnalytics>("/users/me/chess/analytics", {
+    method: "POST",
+    body: JSON.stringify({ provider }),
+  });
+
+export const importChessGames = (values: { pgn?: string; url?: string; username: string }) =>
+  apiRequest<ChessAnalytics>("/users/me/chess/import", {
+    method: "POST",
+    body: JSON.stringify(values),
+  });
+
 export type KnowledgeSource = {
   id: string;
   source_type: "manual" | "file" | "url" | "book" | "article" | "video" | "other";
@@ -173,6 +255,7 @@ export const importKnowledgeUrl = (url: string) =>
 export type ImportCapabilities = {
   ai_features_enabled: boolean;
   gemini_available: boolean;
+  providers?: Record<AIProvider, boolean>;
 };
 
 export type ImportPreviewDocument = {
@@ -208,13 +291,13 @@ export type ImportPreview = {
   concepts: ImportPreviewConcept[];
   relations: ImportPreviewRelation[];
   skipped_files: string[];
-  extraction_mode: "local" | "gemini";
+  extraction_mode: "local" | AIProvider;
 };
 
 export const getImportCapabilities = () =>
   apiRequest<ImportCapabilities>("/acquisition/import-capabilities");
 
-export async function previewKnowledgeImport(files: File[], extractionMode: "local" | "gemini") {
+export async function previewKnowledgeImport(files: File[], extractionMode: "local" | AIProvider) {
   const form = new FormData();
   for (const file of files) form.append("files", file);
   form.append("extraction_mode", extractionMode);

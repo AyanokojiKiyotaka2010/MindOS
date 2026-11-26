@@ -8,11 +8,12 @@ from sqlalchemy.orm import Session
 
 from app.acquisition import validate_import_url
 from app.core.config import get_settings
+from app.integration_security import IntegrationEncryptionError, decrypt_integration_secret
 from app.database import get_db
 from app.import_pipeline import MAX_UPLOAD_BYTES, _normalize, create_import_preview
 from app.models import (
     KnowledgeItem, KnowledgeItemType, KnowledgeRelation, KnowledgeRelationType,
-    KnowledgeSource, Tag, UnderstandingStatus, User,
+    KnowledgeSource, Tag, UnderstandingStatus, User, UserIntegration,
 )
 from app.schemas import ImportCommitRequest
 from app.security import get_current_user, require_csrf
@@ -27,9 +28,21 @@ MAX_TOTAL_UPLOAD_BYTES = 50 * 1024 * 1024
 @router.get("/import-capabilities")
 def import_capabilities(user: User = Depends(get_current_user)):
     settings = get_settings()
+    integrations = {
+        integration.provider: integration
+        for integration in user.integrations
+    }
+    providers = {
+        "gemini": bool(settings.gemini_api_key or (
+            integrations.get("gemini") and integrations["gemini"].encrypted_secret
+        )),
+        "openai": bool(integrations.get("openai") and integrations["openai"].encrypted_secret),
+        "anthropic": bool(integrations.get("anthropic") and integrations["anthropic"].encrypted_secret),
+    }
     return {
         "ai_features_enabled": bool(user.settings and user.settings.ai_features_enabled),
-        "gemini_available": bool(settings.gemini_api_key),
+        "gemini_available": providers["gemini"],
+        "providers": providers,
     }
 
 
@@ -47,11 +60,25 @@ async def import_preview(
     if len(files) > 100:
         raise HTTPException(status_code=413, detail="An import may contain at most 100 uploaded files")
     settings = get_settings()
-    if extraction_mode == "gemini":
+    provider_api_key = None
+    if extraction_mode in {"gemini", "openai", "anthropic"}:
         if not user.settings or not user.settings.ai_features_enabled:
-            raise HTTPException(status_code=403, detail="Enable optional AI features in your profile before using Gemini")
-        if not settings.gemini_api_key:
-            raise HTTPException(status_code=503, detail="Gemini is not configured on the backend")
+            raise HTTPException(status_code=403, detail="Enable optional AI features in your profile before using an AI provider")
+        integration = db.query(UserIntegration).filter(
+            UserIntegration.user_id == user.id,
+            UserIntegration.provider == extraction_mode,
+        ).first()
+        if integration and integration.encrypted_secret:
+            try:
+                provider_api_key = decrypt_integration_secret(integration.encrypted_secret)
+            except IntegrationEncryptionError as error:
+                raise HTTPException(status_code=503, detail=str(error)) from error
+        elif extraction_mode == "gemini":
+            provider_api_key = settings.gemini_api_key or None
+        if not provider_api_key:
+            raise HTTPException(status_code=503, detail=f"{extraction_mode.title()} is not configured for this account")
+    elif extraction_mode != "local":
+        raise HTTPException(status_code=422, detail="Choose local, Gemini, OpenAI, or Anthropic extraction")
 
     uploads: list[tuple[str, bytes]] = []
     total_upload_bytes = 0
@@ -71,6 +98,11 @@ async def import_preview(
         existing_titles,
         gemini_api_key=settings.gemini_api_key if extraction_mode == "gemini" else None,
         gemini_model=settings.gemini_model,
+        provider_api_key=provider_api_key,
+        provider_models={
+            "openai": settings.openai_model,
+            "anthropic": settings.anthropic_model,
+        },
     )
 
 

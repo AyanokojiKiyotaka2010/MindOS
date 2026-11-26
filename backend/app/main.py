@@ -15,6 +15,7 @@ from app.api.routes import learning as learning_routes
 from app.api.routes import mindtrace as mindtrace_routes
 from app.api.routes import dashboard as dashboard_routes
 from app.api.routes import community as community_routes
+from app.api.routes import integrations as integration_routes
 
 settings = get_settings()
 
@@ -55,6 +56,7 @@ app.include_router(learning_routes.router, prefix="/api/v1")
 app.include_router(mindtrace_routes.router, prefix="/api/v1")
 app.include_router(dashboard_routes.router, prefix="/api/v1")
 app.include_router(community_routes.router, prefix="/api/v1")
+app.include_router(integration_routes.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["System"], summary="API welcome")
