@@ -170,6 +170,98 @@ export const importKnowledgeUrl = (url: string) =>
     body: JSON.stringify({ url }),
   });
 
+export type ImportCapabilities = {
+  ai_features_enabled: boolean;
+  gemini_available: boolean;
+};
+
+export type ImportPreviewDocument = {
+  draft_id: string;
+  title: string;
+  source_name: string;
+  source_size_bytes: number;
+  content: string;
+  tags: string[];
+  item_type: KnowledgeItem["item_type"];
+  warnings: string[];
+  duplicate: boolean;
+};
+
+export type ImportPreviewConcept = {
+  draft_id: string;
+  title: string;
+  description: string | null;
+  tags: string[];
+  source_document_ids: string[];
+};
+
+export type ImportPreviewRelation = {
+  draft_id: string;
+  source_draft_id: string;
+  target_draft_id: string;
+  relation_type: KnowledgeRelation["relation_type"];
+  note: string | null;
+};
+
+export type ImportPreview = {
+  documents: ImportPreviewDocument[];
+  concepts: ImportPreviewConcept[];
+  relations: ImportPreviewRelation[];
+  skipped_files: string[];
+  extraction_mode: "local" | "gemini";
+};
+
+export const getImportCapabilities = () =>
+  apiRequest<ImportCapabilities>("/acquisition/import-capabilities");
+
+export async function previewKnowledgeImport(files: File[], extractionMode: "local" | "gemini") {
+  const form = new FormData();
+  for (const file of files) form.append("files", file);
+  form.append("extraction_mode", extractionMode);
+  const response = await fetch("/api/v1/acquisition/import-preview", {
+    method: "POST",
+    credentials: "include",
+    headers: csrfHeaders(),
+    body: form,
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.detail || `Import analysis failed (${response.status})`);
+  }
+  return response.json() as Promise<ImportPreview>;
+}
+
+export const commitKnowledgeImport = (values: {
+  documents: Array<{
+    draft_id: string;
+    title: string;
+    content: string;
+    source_name: string;
+    source_size_bytes: number;
+    tags: string[];
+    item_type: KnowledgeItem["item_type"];
+  }>;
+  concepts: Array<{
+    draft_id: string;
+    title: string;
+    description: string | null;
+    tags: string[];
+  }>;
+  relations: Array<{
+    source_draft_id: string;
+    target_draft_id: string;
+    relation_type: KnowledgeRelation["relation_type"];
+    note: string | null;
+  }>;
+}) => apiRequest<{
+  documents_imported: number;
+  concepts_imported: number;
+  relations_created: number;
+}>("/acquisition/import-commit", {
+  method: "POST",
+  body: JSON.stringify(values),
+});
+
 export const uploadKnowledgeFile = async (file: File) => {
   const csrf = document.cookie
     .split("; ")

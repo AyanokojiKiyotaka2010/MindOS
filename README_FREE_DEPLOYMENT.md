@@ -39,6 +39,18 @@ This creates a new PostgreSQL database; it does not migrate existing MySQL data.
 5. Set `CORS_ORIGINS` in Render to the exact Vercel production origin and redeploy the API.
 6. Open the Vercel `*.vercel.app` URL and test registration, login, profile, vault, and logout.
 
+## Bulk knowledge import and optional Gemini extraction
+
+The Knowledge Vault importer accepts Obsidian or Notion ZIP exports and Markdown, text, PDF, DOCX, PPTX, HTML, and CSV files. Imports are analyzed in memory and shown in a review screen; only selected documents, concepts, and links are saved. ZIP imports are limited to 25 MB per uploaded file, 50 MB total per import, and 100 supported documents. PDF import extracts selectable text; scanned PDFs are not OCR-processed.
+
+Local extraction uses note titles, Markdown headings, tags, wiki links, and repeated phrases. To enable the optional Gemini suggestions:
+
+1. Add `GEMINI_API_KEY` privately to the Render service's environment settings. Do not commit the key or paste it into chat. Optionally set `GEMINI_MODEL` (defaults to `gemini-2.5-flash`).
+2. In MINDOS, enable **Optional AI features** in Profile settings.
+3. During import, explicitly select **Gemini-assisted suggestions**. The selected document text is sent to Google Gemini for that analysis; local extraction does not send content to an AI provider.
+
+Gemini availability, quotas, and possible charges depend on the provider's current terms and your account. Review all generated concepts and links before approving an import.
+
 ## Free-tier limitations
 
 - Free services have quotas and policies that can change; confirm current provider terms before creating accounts.

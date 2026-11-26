@@ -25,6 +25,7 @@ const secondaryNavigation = [
 const pageTitles: Record<string, string> = {
   "/": "Overview",
   "/vault": "Knowledge Vault",
+  "/import": "Import knowledge",
   "/graph": "Knowledge Graph",
   "/learning": "Learning paths",
   "/mindtrace": "Mindtrace",

@@ -114,6 +114,36 @@ class KnowledgeRelationResponse(BaseModel):
     note: str | None
 
 
+class ImportDocumentCommit(BaseModel):
+    draft_id: str = Field(min_length=1, max_length=64)
+    title: str = Field(min_length=1, max_length=255)
+    content: str = Field(max_length=100_000)
+    source_name: str = Field(min_length=1, max_length=512)
+    source_size_bytes: int = Field(ge=0)
+    tags: list[str] = Field(default_factory=list, max_length=20)
+    item_type: str = Field(default="note", pattern=r"^(note|concept|question|insight|quote|resource|summary)$")
+
+
+class ImportConceptCommit(BaseModel):
+    draft_id: str = Field(min_length=1, max_length=64)
+    title: str = Field(min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=10_000)
+    tags: list[str] = Field(default_factory=list, max_length=20)
+
+
+class ImportRelationCommit(BaseModel):
+    source_draft_id: str = Field(min_length=1, max_length=64)
+    target_draft_id: str = Field(min_length=1, max_length=64)
+    relation_type: str = Field(default="related_to", pattern=r"^(related_to|supports|contradicts|expands|depends_on|example_of)$")
+    note: str | None = Field(default=None, max_length=500)
+
+
+class ImportCommitRequest(BaseModel):
+    documents: list[ImportDocumentCommit] = Field(default_factory=list, max_length=100)
+    concepts: list[ImportConceptCommit] = Field(default_factory=list, max_length=100)
+    relations: list[ImportRelationCommit] = Field(default_factory=list, max_length=500)
+
+
 class LearningGoalCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     description: str | None = None

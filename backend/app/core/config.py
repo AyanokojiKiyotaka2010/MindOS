@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     auth_algorithm: str = "HS256"
     access_token_minutes: int = 60
     private_upload_dir: str = "./private_uploads"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
 
     model_config = SettingsConfigDict(
         env_file=".env",

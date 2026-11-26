@@ -69,6 +69,7 @@ export default function ProfilePage() {
         <label className="flex items-center gap-3 text-xs font-semibold text-slate-600 md:col-span-2">
           <input type="checkbox" checked={settings.ai_features_enabled} onChange={(event) => setSettings({ ...settings, ai_features_enabled: event.target.checked })} /> Enable optional AI features
         </label>
+        <p className="-mt-3 text-[10px] leading-5 text-slate-400 md:col-span-2">When enabled, selected documents are sent to Google Gemini only if you choose Gemini during import. Local extraction does not send content to an AI provider.</p>
       </div>
       {message && <p className="mt-5 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{message}</p>}
       {error && <p className="mt-5 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>}

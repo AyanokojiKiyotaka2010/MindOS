@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Archive, Plus, Search, Star } from "lucide-react";
+import { Archive, FileStack, Plus, Search, Star } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   createKnowledgeItem,
   deleteKnowledgeItem,
@@ -102,6 +103,9 @@ export default function VaultPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
+          <Link to="/import" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-4 text-sm font-bold text-violet-800 transition hover:border-violet-300 hover:bg-violet-100">
+            <FileStack size={17} /> Import a knowledge base
+          </Link>
           <form onSubmit={importUrlItem} className="flex gap-3 rounded-2xl border border-slate-100 bg-white p-4">
             <input required type="url" className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="https://example.com/article" value={importUrl} onChange={(event) => setImportUrl(event.target.value)} />
             <button className="rounded-xl bg-brand px-4 text-sm font-bold text-white">Import URL</button>
