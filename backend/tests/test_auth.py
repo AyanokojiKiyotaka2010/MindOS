@@ -7,6 +7,8 @@ from sqlalchemy.pool import StaticPool
 from app.database import get_db
 from app.main import app
 from app.models import Base
+from app.core.config import Settings
+from app.api.routes import auth as auth_routes
 
 
 engine = create_engine(
@@ -192,6 +194,22 @@ def test_acquisition_blocks_private_urls_and_accepts_text_upload():
     )
     assert uploaded.status_code == 200
     assert uploaded.json()["understanding_status"] == "captured"
+
+
+def test_auth_cookies_are_secure_in_production(monkeypatch):
+    monkeypatch.setattr(auth_routes, "get_settings", lambda: Settings(_env_file=None, environment="production"))
+    from fastapi import Response
+    response = Response()
+
+    auth_routes.set_auth_cookies(response, "user-id")
+
+    cookies = [
+        value.decode("latin-1")
+        for key, value in response.raw_headers
+        if key.lower() == b"set-cookie"
+    ]
+    assert len(cookies) == 2
+    assert all("; secure" in cookie.lower() for cookie in cookies)
 
 
 def test_learning_goal_lifecycle():

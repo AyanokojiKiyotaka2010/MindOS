@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.core.config import get_settings
 from app.models import AccountStatus, ProfileVisibility, User, UserProfile, UserSettings
 from app.schemas import LoginRequest, RegisterRequest
 from app.security import create_access_token, hash_password, verify_password
@@ -29,11 +30,12 @@ def check_login_rate_limit(request: Request) -> None:
 
 
 def set_auth_cookies(response: Response, user_id: str) -> None:
+    secure = get_settings().environment.lower() == "production"
     response.set_cookie(
         "mindos_session",
         create_access_token(user_id),
         httponly=True,
-        secure=False,
+        secure=secure,
         samesite="strict",
         max_age=60 * 60,
         path="/",
@@ -42,7 +44,7 @@ def set_auth_cookies(response: Response, user_id: str) -> None:
         "mindos_csrf",
         token_urlsafe(32),
         httponly=False,
-        secure=False,
+        secure=secure,
         samesite="strict",
         max_age=60 * 60,
         path="/",

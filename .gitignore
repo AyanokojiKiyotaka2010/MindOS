@@ -22,3 +22,4 @@ Thumbs.db
 # MINDOS private runtime data
 backend/private_uploads/
 backend/mindos.db
+backups/

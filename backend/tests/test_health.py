@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.core.config import get_settings
 
 client = TestClient(app)
 
@@ -16,5 +17,6 @@ def test_health_endpoint_returns_ok() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ok"
-    assert payload["application"] == "MINDOS API"
-    assert payload["version"] == "0.1.0"
+    settings = get_settings()
+    assert payload["application"] == settings.app_name
+    assert payload["version"] == settings.app_version

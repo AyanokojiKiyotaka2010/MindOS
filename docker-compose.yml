@@ -1,11 +1,12 @@
 services:
   mysql:
     image: mysql:8.4
+    restart: unless-stopped
     environment:
       MYSQL_DATABASE: mindos
       MYSQL_USER: mindos_app
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me-before-beta}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in the project root .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in the project root .env}
     volumes:
       - mysql_data:/var/lib/mysql
       - ./backend/database/migrations/001_initial_schema.up.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql:ro
@@ -19,11 +20,12 @@ services:
   backend:
     build:
       context: ./backend
+    restart: unless-stopped
     environment:
       ENVIRONMENT: production
-      DATABASE_URL: mysql+pymysql://mindos_app:${MYSQL_PASSWORD:-change-me-before-beta}@mysql:3306/mindos?charset=utf8mb4
-      AUTH_SECRET: ${AUTH_SECRET:-change-me-to-a-long-random-secret}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+      DATABASE_URL: mysql+pymysql://mindos_app:${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in the project root .env}@mysql:3306/mindos?charset=utf8mb4
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in the project root .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in the project root .env}
     depends_on:
       mysql:
         condition: service_healthy
@@ -33,10 +35,11 @@ services:
   frontend:
     build:
       context: ./frontend
+    restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "80:80"
+      - "127.0.0.1:8080:80"
 
 volumes:
   mysql_data:
